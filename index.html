@@ -11,12 +11,12 @@
 </head>
 <body>
 <div class="wrap">
-<nav class="nav"><a class="logo" href="#">📖 PPD</a><div class="navlinks"><a href="#home">Home</a><a href="#discover">Discover</a><a href="#about">About</a></div><div id="account"><button class="btn" onclick="openModal('auth')">Sign in</button></div></nav>
+<nav class="nav"><a class="logo" href="#">📖 PPD</a><div class="navlinks"><a href="#home">Home</a><a href="#discover">Discover</a><a href="#about">About</a></div><div id="account" class="account-actions"><button class="btn" onclick="openModal('auth')">🔐 Login / Sign up</button></div></nav>
 <section id="home" class="hero">
 <div class="eyebrow">A diary for everyone</div>
 <h1>Your thoughts. <span>Your story.</span> Your space.</h1>
 <p>Write privately, share selectively, and discover stories from people around the world. Public Personal Diary gives every person a place to keep their memories.</p>
-<div class="actions"><button class="btn" onclick="openModal('auth')">Create your diary</button><a class="btn ghost" href="#discover">Explore public stories</a></div>
+<div class="actions"><button class="btn" onclick="openModal('auth')">🔐 Login / Sign up</button><button class="btn ghost" onclick="openModal('auth');setTimeout(()=>{if(!signingUp)toggleAuth()},0)">Create account</button><a class="btn ghost" href="#discover">Explore public stories</a></div>
 </section>
 <section class="section"><div class="cards">
 <div class="card"><div class="icon">🔒</div><h3>Private by default</h3><p>Your diary entries stay private unless you choose to publish them.</p></div>
@@ -28,7 +28,7 @@
 <div id="feed" class="feed"><div class="card">Loading stories…</div></div></section>
 <section id="about" class="section"><div class="about">
 <div class="card"><div class="icon">✨</div><h2>About Public Personal Diary</h2><p>PPD is designed around a simple idea: everyone should have a place to write. You control what remains personal and what becomes part of the public diary.</p><p>Created as a community-first diary experience with a clean, distraction-free design.</p></div>
-<div class="card"><h3>Created by</h3><p class="sub">The Public Personal Diary project</p><div class="stat">PPD</div><p>Built for people who want to write, remember and share.</p></div>
+<div class="card"><h3>Created by</h3><p class="sub">Chethan</p><div class="stat">PPD</div><p>Created by Chethan as a place for everyone to write, remember and share.</p></div>
 </div></section>
 <section id="mineSection" class="section hidden"><h2>Your diary</h2><p class="sub">Your private and public entries.</p><div id="mine" class="feed"></div></section>
 <footer class="footer">© 2026 Public Personal Diary · Write freely. Share intentionally.</footer>
