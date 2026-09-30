@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Public Personal Diary</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#0b1020;--card:#121a2d;--muted:#8f9bb5;--text:#f5f7ff;--accent:#7c5cff;--line:#24304a}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#080d19,#111a31);color:var(--text);font:16px system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:1050px;margin:auto;padding:28px 18px 70px}.top{display:flex;justify-content:space-between;gap:16px;align-items:center}.brand{font-weight:800;font-size:20px}.btn{border:0;border-radius:12px;padding:11px 16px;background:var(--accent);color:white;font-weight:700;cursor:pointer}.btn.secondary{background:#202a42}.hero{padding:70px 0 30px}.hero h1{font-size:clamp(42px,8vw,82px);line-height:.95;margin:0 0 18px}.hero p{color:var(--muted);max-width:650px;font-size:18px}.bar{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0}.input,textarea{width:100%;border:1px solid var(--line);background:#0d1527;color:var(--text);border-radius:12px;padding:12px}.search{flex:1;min-width:220px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}.card{background:rgba(18,26,45,.9);border:1px solid var(--line);border-radius:18px;padding:18px}.meta{color:var(--muted);font-size:13px}.entry{white-space:pre-wrap;line-height:1.65;margin-top:12px}.modal{position:fixed;inset:0;background:#0009;display:none;place-items:center;padding:18px}.modal.open{display:grid}.modalbox{width:min(520px,100%);background:#121a2d;border:1px solid var(--line);border-radius:20px;padding:22px}.stack{display:grid;gap:10px}.hidden{display:none}.pill{display:inline-block;padding:5px 9px;border-radius:99px;background:#202a42;color:#bfc8dc;font-size:12px}
+</style>
+</head>
+<body>
+<main>
+<header class="top"><div class="brand">📖 Public Personal Diary</div><div id="account"></div></header>
+<section class="hero"><h1>Write your story.</h1><p>A personal diary for everyone. Keep entries private by default, or publish the ones you want the world to read.</p>
+<div class="bar"><input id="search" class="input search" placeholder="Search public entries…"><button class="btn" onclick="openModal('auth')">Sign in / Sign up</button><button class="btn secondary hidden" id="writeBtn" onclick="openModal('write')">Write entry</button></div></section>
+<section><h2>Public diary</h2><div id="feed" class="grid"></div></section>
+<section id="mineSection" class="hidden"><h2>Your diary</h2><div id="mine" class="grid"></div></section>
+</main>
+
+<div id="auth" class="modal"><div class="modalbox"><button class="btn secondary" onclick="closeModal('auth')">Close</button><h2 id="authTitle">Sign in</h2>
+<div class="stack"><input id="username" class="input" placeholder="Username (sign up only)"><input id="email" class="input" type="email" placeholder="Email"><input id="password" class="input" type="password" placeholder="Password"><button class="btn" onclick="submitAuth()">Continue</button><button class="btn secondary" onclick="toggleAuth()">Switch to sign up</button><p id="authMsg" class="meta"></p></div></div></div>
+
+<div id="write" class="modal"><div class="modalbox"><button class="btn secondary" onclick="closeModal('write')">Close</button><h2>Today's entry</h2><div class="stack"><textarea id="content" rows="10" placeholder="What happened today?"></textarea><label><input id="public" type="checkbox"> Make this entry public</label><button class="btn" onclick="saveEntry()">Save entry</button><p id="writeMsg" class="meta"></p></div></div></div>
+
+<script>
+const SUPABASE_URL="https://cvzvpgwovqkplntfztsk.supabase.co";
+const SUPABASE_KEY="PASTE_YOUR_SUPABASE_PUBLISHABLE_KEY_HERE";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let signingUp=false, user=null;
+const $=id=>document.getElementById(id);
+function openModal(id){$(id).classList.add("open")}
+function closeModal(id){$(id).classList.remove("open")}
+function toggleAuth(){signingUp=!signingUp;$("authTitle").textContent=signingUp?"Sign up":"Sign in";$("username").classList.toggle("hidden",!signingUp);$("authMsg").textContent=""}
+function indiaDate(){return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata"}).format(new Date())}
+async function submitAuth(){
+  const email=$("email").value.trim(), password=$("password").value, username=$("username").value.trim().toLowerCase();
+  if(!email||!password||(signingUp&&!username)){ $("authMsg").textContent="Please fill in the required fields."; return; }
+  $("authMsg").textContent="Working…";
+  if(signingUp){
+    const {data,error}=await sb.auth.signUp({email,password,options:{data:{username,display_name:username}}});
+    if(error){$("authMsg").textContent=error.message;return}
+    $("authMsg").textContent=data.session?"Account created.":"Account created. Check your email if confirmation is enabled.";
+    if(data.session){user=data.user;closeModal("auth");await refresh()}
+  }else{
+    const {data,error}=await sb.auth.signInWithPassword({email,password});
+    if(error){$("authMsg").textContent=error.message;return}
+    user=data.user;closeModal("auth");await refresh();
+  }
+}
+async function signOut(){await sb.auth.signOut();user=null;refresh()}
+async function loadFeed(){
+  const q=$("search").value.trim();
+  let query=sb.from("diary_entries").select("id,entry_date,content,user_id,created_at").eq("is_public",true).order("entry_date",{ascending:false}).limit(100);
+  const {data,error}=await query;
+  if(error){$("feed").innerHTML='<div class="card">Run supabase.sql first, then add your publishable key to index.html.</div>';return}
+  const ids=[...new Set((data||[]).map(x=>x.user_id))];
+  let profiles=[];
+  if(ids.length){const p=await sb.from("profiles").select("id,username,display_name").in("id",ids);profiles=p.data||[]}
+  const map=Object.fromEntries(profiles.map(p=>[p.id,p]));
+  const rows=(data||[]).filter(x=>!q||x.content.toLowerCase().includes(q.toLowerCase())||(map[x.user_id]?.username||"").toLowerCase().includes(q.toLowerCase()));
+  $("feed").innerHTML=rows.length?rows.map(x=>'<article class="card"><div class="meta">@'+(map[x.user_id]?.username||"user")+' · '+x.entry_date+'</div><div class="entry">'+escapeHtml(x.content)+'</div></article>').join(""):'<div class="card">No public entries found.</div>';
+}
+async function loadMine(){
+  if(!user){$("mineSection").classList.add("hidden");return}
+  $("mineSection").classList.remove("hidden");
+  const {data,error}=await sb.from("diary_entries").select("*").eq("user_id",user.id).order("entry_date",{ascending:false}).limit(50);
+  if(error){$("mine").innerHTML='<div class="card">'+escapeHtml(error.message)+'</div>';return}
+  $("mine").innerHTML=(data||[]).length?(data||[]).map(x=>'<article class="card"><div class="meta">'+x.entry_date+' · '+(x.is_public?"Public":"Private")+'</div><div class="entry">'+escapeHtml(x.content)+'</div></article>').join(""):'<div class="card">Your diary is empty. Write your first entry.</div>';
+}
+async function saveEntry(){
+  if(!user){$("writeMsg").textContent="Please sign in first.";return}
+  const content=$("content").value.trim();
+  if(!content){$("writeMsg").textContent="Write something first.";return}
+  const {error}=await sb.from("diary_entries").upsert({user_id:user.id,entry_date:indiaDate(),content,is_public:$("public").checked},{onConflict:"user_id,entry_date"});
+  $("writeMsg").textContent=error?error.message:"Saved.";
+  if(!error){$("content").value="";closeModal("write");await loadFeed();await loadMine()}
+}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+async function refresh(){
+  const {data}=await sb.auth.getUser(); user=data.user||null;
+  $("account").innerHTML=user?'<span class="pill">'+escapeHtml(user.email||"signed in")+'</span> <button class="btn secondary" onclick="signOut()">Sign out</button>':'';
+  $("writeBtn").classList.toggle("hidden",!user);
+  await loadFeed();await loadMine();
+}
+$("search").addEventListener("input",loadFeed);
+sb.auth.onAuthStateChange(()=>setTimeout(refresh,0));
+refresh();
+</script>
+</body>
+</html>
